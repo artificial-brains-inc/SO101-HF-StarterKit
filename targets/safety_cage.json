@@ -1,0 +1,44 @@
+{
+  "robot": {
+    "type": "so101_follower",
+    "id": "my_awesome_follower_arm",
+    "port": "/dev/ttyACM0",
+    "data_name_present": "Present_Position",
+    "motor_names": [
+      "shoulder_pan",
+      "shoulder_lift",
+      "elbow_flex",
+      "wrist_flex",
+      "wrist_roll",
+      "gripper"
+    ]
+  },
+  "created_at_unix": 1769741955.0234413,
+  "limits_raw": {
+    "shoulder_pan": {
+      "min": 1375.0,
+      "max": 2442.0
+    },
+    "shoulder_lift": {
+      "min": 872.0,
+      "max": 2931.0
+    },
+    "elbow_flex": {
+      "min": 1116.0,
+      "max": 3025.0
+    },
+    "wrist_flex": {
+      "min": 1232.0,
+      "max": 3060.0
+    },
+    "wrist_roll": {
+      "min": 12.0,
+      "max": 1169.0
+    },
+    "gripper": {
+      "min": 2044.0,
+      "max": 2890.0
+    }
+  },
+  "buffer_ticks": 25.0
+}

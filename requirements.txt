@@ -1,0 +1,23 @@
+# --- ArtificialBrains SDK (you said you're bumping to 0.1.5) ---
+artificialbrains-sdk==0.1.5
+
+# --- Hugging Face / LeRobot (SO-101 follower + Feetech bus support) ---
+lerobot[feetech]
+
+# (Optional but commonly needed for Hugging Face auth / downloads / model pulls)
+huggingface_hub>=0.20
+
+# --- Core runtime ---
+numpy>=1.24
+requests>=2.31
+psutil>=5.9
+
+# --- Real-time socket transport (AB SDK uses socket.io under the hood; keep explicit for safety) ---
+python-socketio>=5.11
+websocket-client>=1.7
+
+# --- Camera / JPEG encoding (your controller uses cv2.VideoCapture + cv2.imencode) ---
+opencv-python>=4.8
+
+# --- Optional: .env support (your controller tries python-dotenv but doesn't require it) ---
+python-dotenv>=1.0

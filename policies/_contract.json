@@ -1,0 +1,157 @@
+{
+  "constants": {
+    "gamma": 64,
+    "outputWindowN": 32,
+    "feedbackN": 32,
+    "feedbackT": 128
+  },
+  "io": {
+    "inputs": [
+      {
+        "id": "Cam",
+        "kind": "Image",
+        "fromOutput": null
+      },
+      {
+        "id": "fbGripper",
+        "kind": "Feedback",
+        "fromOutput": "gripper"
+      },
+      {
+        "id": "FB_shoulder_pan",
+        "kind": "Feedback",
+        "fromOutput": "shoulder_pan"
+      },
+      {
+        "id": "FB_shoulder_lift",
+        "kind": "Feedback",
+        "fromOutput": "shoulder_lift"
+      },
+      {
+        "id": "FB_elbow_flex",
+        "kind": "Feedback",
+        "fromOutput": "elbow_flex"
+      },
+      {
+        "id": "FB_wrist_flex",
+        "kind": "Feedback",
+        "fromOutput": "wrist_flex"
+      },
+      {
+        "id": "FB_wrist_roll",
+        "kind": "Feedback",
+        "fromOutput": "wrist_roll"
+      },
+      {
+        "id": "shoulder_pan_input",
+        "kind": "Proprioception",
+        "fromOutput": "shoulder_pan"
+      },
+      {
+        "id": "shoulder_lift_input",
+        "kind": "Proprioception",
+        "fromOutput": "shoulder_lift"
+      },
+      {
+        "id": "elbow_felx_input",
+        "kind": "Proprioception",
+        "fromOutput": "elbow_flex"
+      },
+      {
+        "id": "wrist_roll_input",
+        "kind": "Proprioception",
+        "fromOutput": "wrist_roll"
+      },
+      {
+        "id": "wrist_flex_input",
+        "kind": "Proprioception",
+        "fromOutput": "wrist_flex"
+      },
+      {
+        "id": "gripper_input",
+        "kind": "Proprioception",
+        "fromOutput": "gripper"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "shoulder_pan",
+        "kind": "other",
+        "n": 32
+      },
+      {
+        "id": "shoulder_lift",
+        "kind": "other",
+        "n": 32
+      },
+      {
+        "id": "elbow_flex",
+        "kind": "other",
+        "n": 32
+      },
+      {
+        "id": "wrist_flex",
+        "kind": "other",
+        "n": 32
+      },
+      {
+        "id": "wrist_roll",
+        "kind": "other",
+        "n": 32
+      },
+      {
+        "id": "gripper",
+        "kind": "other",
+        "n": 32
+      }
+    ],
+    "feedback": [
+      {
+        "id": "fbGripper",
+        "fromOutput": "gripper",
+        "toLayer": "W_STDP3_Outgripper_to_gripper",
+        "n": 50
+      },
+      {
+        "id": "FB_shoulder_pan",
+        "fromOutput": "shoulder_pan",
+        "toLayer": "W_STDP3_Outshoulder_pan_to_shoulder_pan",
+        "n": 50
+      },
+      {
+        "id": "FB_shoulder_lift",
+        "fromOutput": "shoulder_lift",
+        "toLayer": "W_STDP3_Outshoulder_lift_to_shoulder_lift",
+        "n": 50
+      },
+      {
+        "id": "FB_elbow_flex",
+        "fromOutput": "elbow_flex",
+        "toLayer": "W_STDP3_Outelbow_flex_to_elbow_flex",
+        "n": 50
+      },
+      {
+        "id": "FB_wrist_flex",
+        "fromOutput": "wrist_flex",
+        "toLayer": "W_STDP3_Outwrist_flex_to_wrist_flex",
+        "n": 50
+      },
+      {
+        "id": "FB_wrist_roll",
+        "fromOutput": "wrist_roll",
+        "toLayer": "W_STDP3_Outwrist_roll_to_wrist_roll",
+        "n": 50
+      }
+    ],
+    "stdp3": {
+      "layers": [
+        "W_STDP3_Outshoulder_pan_to_shoulder_pan",
+        "W_STDP3_Outshoulder_lift_to_shoulder_lift",
+        "W_STDP3_Outelbow_flex_to_elbow_flex",
+        "W_STDP3_Outwrist_flex_to_wrist_flex",
+        "W_STDP3_Outwrist_roll_to_wrist_roll",
+        "W_STDP3_Outgripper_to_gripper"
+      ]
+    }
+  }
+}

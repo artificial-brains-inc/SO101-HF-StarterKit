@@ -1,0 +1,73 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+
+# Never commit shadowed stdlib/module names
+cv2
+os
+sys
+json
+logging
+threading
+serial
+
+
+# Virtualenvs
+.venv/
+venv/
+ENV/
+.env/
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# ===== OS / Editor =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ===== Robotics / Media =====
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.wav
+*.mp3
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# ===== Hardware / Device artifacts =====
+*.bag
+*.pcap
+*.pcapng
+
+# ===== Local configs / secrets =====
+config/local.json
+secrets/
+**/credentials*.json
+*.key
+*.pem
+
+# ===== Misc =====
+tmp/
+temp/
+.cache/

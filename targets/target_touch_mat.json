@@ -1,0 +1,28 @@
+{
+  "robot": {
+    "type": "so101_follower",
+    "id": "my_awesome_follower_arm",
+    "port": "/dev/ttyACM0",
+    "baud": 1000000,
+    "data_name_present": "Present_Position",
+    "motor_names": [
+      "shoulder_pan",
+      "shoulder_lift",
+      "elbow_flex",
+      "wrist_flex",
+      "wrist_roll",
+      "gripper"
+    ]
+  },
+  "target": {
+    "q_raw": [
+      1728.0,
+      2731.0,
+      1323.0,
+      3053.0,
+      972.0,
+      2442.0
+    ],
+    "captured_at_unix": 1769567691.7714987
+  }
+}

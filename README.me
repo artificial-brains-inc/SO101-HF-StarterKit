@@ -1,0 +1,376 @@
+# SO-101 Robot Controller for Artificial Brains
+
+This repository contains a **real-time robot controller** for the **SO-101 follower arm**, built around the **ArtificialBrains (AB) Python SDK**.
+
+The controller’s role is **not** to be the brain.  
+Its role is to **close the loop** between a physical robot and an Artificial Brains run.
+
+At a high level, the controller:
+
+- Receives **spike-based outputs** from AB (`cycle:update`)
+- Decodes spikes into **safe motor deltas**
+- Executes motion in **RAW ticks** (deterministic, calibration-free)
+- Sends **sensory inputs** (camera + proprioception) back to AB
+- Computes **feedback (deviation)** and **rewards** from task error
+- Supports **continual learning** and **reset / episodic (one-shot) learning**
+
+LeRobot (Hugging Face) is used only as the **hardware interface layer** for the SO-101 and Feetech bus.  
+All learning logic lives in **ArtificialBrains**.
+
+---
+
+## Controller responsibilities
+
+### What the controller receives from AB
+
+- **`io:need`**
+  - AB requests inputs for the current cycle
+  - The controller responds with:
+    - Camera image (JPEG)
+    - Motor proprioception (RAW ticks + velocity)
+
+- **`cycle:update`**
+  - AB sends output spikes as:
+    - `{ t, id, bits }` or `[t, id, bits]`
+  - Spikes represent motor intent over time
+
+### What the controller sends to AB
+
+- **Inputs**
+  - **Image**: one JPEG per request
+  - **Proprioception**: per-joint RAW ticks + velocity
+
+- **Cycle boundary**
+  - **`robot:cycle_done`**
+    - Emitted only after the controller finishes executing the cycle
+    - Ensures AB’s pipeline stays synchronized
+
+- **Learning signals**
+  - **Feedback (deviation)**
+    - Float32 time-series derived from task error
+  - **Reward**
+    - Global reward
+    - Per-layer reward (STDP3 layers)
+
+---
+
+## Learning loop (error → feedback → reward)
+
+### Error definition
+
+The controller computes error **entirely in RAW ticks**, normalized by the safety cage:
+
+```
+error = mean_joints( |q_now - q_target| / cage_span )
+```
+
+This keeps learning:
+- deterministic
+- scale-independent
+- calibration-free
+
+### Feedback (deviation)
+
+At the end of each executed cycle:
+
+1. The controller compares:
+   - pose at cycle start
+   - pose at cycle end
+2. Builds a **DeviationContext**
+3. Generates a deviation signal for each feedback channel
+4. Sends `deviation_f32` back to AB
+
+Key tuning variables:
+- `SO101_DEV_SCALE`
+- `SO101_DEV_DEADZONE`
+
+### Reward
+
+Also at cycle end:
+
+- Computes:
+  - global task progress
+  - per-layer reward (STDP3)
+- Sends reward with the **executed cycle id**
+
+This allows AB to combine:
+- global improvement signals
+- local synaptic learning signals
+
+---
+
+## Execution modes
+
+### Continual learning mode
+
+- Motor goals accumulate across cycles
+- Learning is continuous and stateful
+
+```ini
+SO101_DO_RESET=0
+```
+
+### Reset / episodic (one-shot) mode
+
+- After **every cycle**, the robot is reset to a known pose
+- Each cycle becomes an independent learning episode
+
+```ini
+SO101_DO_RESET=1
+SO101_INIT_JSON=targets/init_pose.json
+```
+
+Reset happens:
+- **after** `robot:cycle_done`
+- **after** feedback and reward are sent
+- exactly **once per cycle**
+
+---
+
+## Safety & determinism
+
+Design choices are intentional:
+
+- **RAW ticks only**
+  - No degree normalization
+  - No calibration registry
+- **Explicit safety cage**
+  - Every command is clamped
+- **Serialized bus access**
+  - Feetech buses are not thread-safe
+- **Per-joint stopper**
+  - Prevents command queueing and runaway motion
+
+---
+
+## Preparing the robot (important)
+
+Before running the controller, you must explicitly define:
+
+- the robot’s **safety cage**
+- the **target pose**
+- (optionally) a **reset / home pose**
+
+These are created using the helper scripts in `tools/`.
+
+### Repository layout
+
+```
+targets/
+├─ init_pose.json
+├─ safety_cage.json
+└─ target_touch.json
+
+tools/
+├─ build_safety_cage.py
+├─ read_q.py
+├─ teach_init_q.py
+└─ teach_target_q.py
+```
+
+---
+
+## 1) Build the safety cage (required)
+
+The safety cage defines per-joint RAW tick limits.  
+Every command is clamped to this cage at runtime.
+
+```bash
+python tools/build_safety_cage.py
+```
+
+This script:
+- Reads joint limits from the robot
+- Adds a buffer to avoid hard stops
+- Writes `targets/safety_cage.json`
+
+The controller **will not start** without this file.
+
+---
+
+## 2) Teach the target pose (required)
+
+The target pose is what the brain is trying to reach.
+
+```bash
+python tools/teach_target_q.py
+```
+
+Flow:
+- Torque is enabled
+- You manually place the robot at the desired target
+- RAW joint ticks are recorded
+- Writes `targets/target_touch.json`
+
+This target is used for:
+- error computation
+- feedback generation
+- reward calculation
+
+---
+
+## 3) Teach the reset / init pose (optional)
+
+Used only if reset mode is enabled.
+
+```bash
+python tools/teach_init_q.py
+```
+
+Writes:
+
+```
+targets/init_pose.json
+```
+
+If reset mode is enabled and this file exists:
+- The robot returns here after every cycle
+
+If reset mode is enabled without this file:
+- The robot holds its current pose instead
+
+---
+
+## 4) Read current joint positions (debug)
+
+```bash
+python tools/read_q.py
+```
+
+Useful for:
+- inspecting RAW ticks
+- validating cage limits
+- sanity-checking poses
+
+---
+
+## Configuration (.env)
+
+### ArtificialBrains
+
+```ini
+AB_BASE_URL=http://app.artificialbrains.ai/api
+API_KEY=
+PROJECT_ID=
+SOCKET_NAMESPACE=/ab
+```
+
+### SO-101 / robot
+
+```ini
+SO101_PORT=/dev/ttyACM0
+SO101_ID=my_awesome_follower_arm
+
+SO101_PER_STEP_MAX_TICKS=10
+SO101_GAIN=0.8
+
+SO101_DO_RESET=1
+SO101_INIT_JSON=targets/init_pose.json
+```
+
+### Camera
+
+```ini
+SO101_CAM_DEV=/dev/video2
+CAMERA_INDEX=0
+CAMERA_WIDTH=640
+CAMERA_HEIGHT=480
+JPEG_QUALITY=90
+CAMERA_FPS=30
+```
+
+### Ultrasound (optional)
+
+```ini
+ULTRASOUND_MODE=serial
+ULTRASOUND_SERIAL=/dev/ttyUSB0
+ULTRASOUND_BAUD=115200
+
+# or
+# ULTRASOUND_MODE=none
+```
+
+### Control loop
+
+```ini
+CONTROL_HZ=10
+```
+
+### Feedback tuning
+
+```ini
+SO101_DEV_DEADZONE=0
+SO101_DEV_SCALE=50
+```
+
+### Movement stopper
+
+```ini
+SO101_WAIT_EPS_TICKS=8
+SO101_WAIT_STABLE_READS=2
+SO101_WAIT_TIMEOUT_S=0.5
+SO101_WAIT_POLL_HZ=20
+SO101_WAIT_MIN_DV_TICKS=1
+```
+
+---
+
+## Running the controller
+
+```bash
+source .venv/bin/activate
+python so101_ab_controller.py
+```
+
+Minimum required:
+- `PROJECT_ID`
+- `API_KEY` (recommended)
+- `targets/safety_cage.json`
+- `targets/target_touch.json`
+
+---
+
+## Notes on LeRobot
+
+LeRobot (Hugging Face) is used only to:
+- connect to the SO-101
+- read/write Feetech bus registers
+
+All learning, timing, credit assignment, and feedback logic is handled by **ArtificialBrains**.
+
+---
+
+## Expected logs
+
+A healthy run includes logs for:
+
+- socket connection
+- `cycle:update` summaries
+- buffered cycle intents
+- per-joint execution steps
+- `robot:cycle_done`
+- reward + feedback submission
+
+If `cycle:update` stops appearing:
+- AB is usually waiting for `robot:cycle_done`
+- the controller is blocked executing a cycle
+
+---
+
+## Design intent
+
+This controller is designed to be:
+
+- **explicit**
+- **deterministic**
+- **inspectable**
+- **reproducible**
+
+Nothing is hidden:
+- no magic normalization
+- no silent calibration
+- no implicit safety assumptions
+
+The brain learns.  
+The controller executes and measures.  
+ArtificialBrains closes the loop.
