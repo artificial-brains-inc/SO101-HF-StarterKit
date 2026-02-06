@@ -2,26 +2,30 @@
 User-owned policy file (created once; never overwritten).
 
 Goal:
-  For EACH feedback input id (fb.id), produce deviation_f32:
-    dev: list[float] length T, values typically in [-1,1] but not required.
-  The server will convert dev into a feedback raster using baseline + your corrections.
+  For EACH feedback input id (fb.id), produce deviation_f32-like data:
+    dev: list[float] length T, values in [-1, 1].
 
-Contract inputs:
-  from policies._contract import FEEDBACK_IDS, FEEDBACK_INFO
+We keep the output format identical to the "deviation_f32" path so the server
+doesn't need to change.
 
-We interpret FEEDBACK_INFO to map:
-  feedback_id -> joint_name   (via info["fromOutput"] or info["outputFrom"])
+Meaning (now this is ERROR, not deviation):
+  dev[t] = signed_normalized_error_joint in [-1,1], constant across all t in [0..T-1]
 
-IMPORTANT CHANGE (distance-based deviation):
-  We compute ONE deviation per joint per cycle from END normalized error:
-    e = err_end                 (0 near target, larger when far)
-    dev[t] = e * scale          (constant across all t in [0..T-1])
+Normalization rule (per joint):
+  Let:
+    e_init = (q_init - q_target)   # signed
+    e_end  = (q_end  - q_target)   # signed
 
-So:
-  - dev ≈ 0 means "very close to target" (should protect / less random)
-  - dev large means "far from target" (should explore / more random)
+  mag = clamp01(abs(e_end) / max(abs(e_init), eps))
+  crossed = (e_init * e_end) < 0     # sign flip => overshoot
+  err_signed = -mag if crossed else +mag
 
-Deterministic + stateless (besides what the controller passes in ctx).
+Edge case:
+  If d_init is ~0 (started at target):
+    - if d_end is ~0 => err = 0
+    - else           => err = 1
+
+Deterministic, stateless, simple.
 """
 
 from __future__ import annotations
@@ -33,107 +37,85 @@ from policies._contract import FEEDBACK_INFO
 
 
 @dataclass
-class DeviationContext:
+class ErrorContext:
     """
-    Controller supplies per-cycle error snapshots.
-
-    err_start_by_joint:
-      joint_name -> normalized abs error at cycle start (0..~1)
-      (kept for compatibility / debugging; not used for distance-based dev)
-
-    err_end_by_joint:
-      joint_name -> normalized abs error at cycle end (0..~1)
-      (this is the distance-to-target signal we use)
+    Controller snapshot for ONE cycle.
+    Values are joint positions in ANY units (ticks, degrees, etc) as long as
+    init/end/target are consistent.
     """
-    err_start_by_joint: Optional[Dict[str, float]] = None
-    err_end_by_joint: Optional[Dict[str, float]] = None
-
-    # shaping knobs (controller can pass env-derived values)
-    dev_scale: float = 50.0
-    dev_deadzone: float = 0.0
+    q_init_by_joint: Dict[str, float]
+    q_end_by_joint: Dict[str, float]
+    q_target_by_joint: Dict[str, float]
 
 
-def _feedback_joint_for_id(feedback_id: str) -> Optional[str]:
-    """
-    Map a feedback input id -> joint name via FEEDBACK_INFO.
-
-    We accept either:
-      info["fromOutput"]  (preferred)
-      info["outputFrom"]  (alternate key)
-      info["joint"]       (fallback if you ever add it)
-    """
+def _joint_for_feedback_id(feedback_id: str) -> Optional[str]:
     fid = str(feedback_id)
-    try:
-        for info in (FEEDBACK_INFO or []):
-            if str(info.get("id")) != fid:
-                continue
-            j = info.get("fromOutput") or info.get("outputFrom") or info.get("joint")
-            if j:
-                return str(j)
-    except Exception:
-        pass
+    for info in (FEEDBACK_INFO or []):
+        if str(info.get("id")) != fid:
+            continue
+        j = info.get("fromOutput") or info.get("outputFrom") or info.get("joint")
+        if j:
+            return str(j)
     return None
 
 
-def _build_constant_deviation(
-    *,
-    err_end: float,
-    T: int,
-    dev_scale: float,
-    dev_deadzone: float,
-) -> List[float]:
-    """
-    Distance-based deviation per cycle:
-      e = err_end                 (0 near target, larger when far)
-      dev[t] = e * scale          constant for all t
-    """
+def _clamp01(x: float) -> float:
+    if x < 0.0:
+        return 0.0
+    if x > 1.0:
+        return 1.0
+    return float(x)
+
+def _clamp11(x: float) -> float:
+    if x < -1.0:
+        return -1.0
+    if x > 1.0:
+        return 1.0
+    return float(x)
+
+
+def _constant_T(v: float, T: int) -> List[float]:
     T = int(T)
     if T <= 0:
         return []
-
-    e = float(err_end)  # distance to target (assumed >= 0 in your normalized abs error)
-    dz = float(dev_deadzone)
-    if dz > 0.0 and e < dz:
-        e = 0.0
-
-    v = e * float(dev_scale)
-    return [v] * T
+    return [float(v)] * T
 
 
-def compute_deviation(
+def compute_error(
     feedback_id: str,
     *,
     T: int,
-    ctx: Optional[DeviationContext] = None,
+    ctx: ErrorContext,
 ) -> List[float]:
     """
-    Return dev[t] length T for THIS feedback channel.
-
-    Distance-based meaning:
-      dev ~ 0   => close to target
-      dev large => far from target
-
-    Default is all zeros if:
-      - controller didn't provide end error for that joint
+    Returns dev-like list[float] length T in [-1,1] for THIS feedback channel,
+    representing per-joint SIGNED normalized error (negative => overshoot).
     """
     T = int(T)
     if T <= 0:
         return []
 
-    if ctx is None or not ctx.err_end_by_joint:
-        return [0.0] * T
-
-    joint = _feedback_joint_for_id(feedback_id)
+    joint = _joint_for_feedback_id(feedback_id)
     if not joint:
-        return [0.0] * T
+        return _constant_T(0.0, T)
 
-    j = str(joint)
-    if j not in ctx.err_end_by_joint:
-        return [0.0] * T
+    q0 = float(ctx.q_init_by_joint.get(joint, 0.0))
+    q1 = float(ctx.q_end_by_joint.get(joint, 0.0))
+    qt = float(ctx.q_target_by_joint.get(joint, 0.0))
 
-    return _build_constant_deviation(
-        err_end=float(ctx.err_end_by_joint.get(j, 0.0)),
-        T=T,
-        dev_scale=float(ctx.dev_scale),
-        dev_deadzone=float(ctx.dev_deadzone),
-    )
+    e0 = (q0 - qt)   # signed error at init
+    e1 = (q1 - qt)   # signed error at end
+    d0 = abs(e0)
+    d1 = abs(e1)
+
+    eps = 1e-9
+    if d0 <= eps:
+        # started essentially at target: no side to define overshoot
+        mag = 0.0 if d1 <= eps else 1.0
+        err_signed = 0.0 if d1 <= eps else 1.0
+    else:
+        mag = _clamp01(d1 / d0)
+        crossed = (e0 * e1) < 0.0
+        err_signed = (-mag) if crossed else (+mag)
+
+    return _constant_T(_clamp11(err_signed), T)

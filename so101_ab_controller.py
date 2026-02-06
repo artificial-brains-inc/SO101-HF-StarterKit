@@ -77,7 +77,7 @@ from policies._contract import (
     FEEDBACK_INFO as CONTRACT_FEEDBACK_INFO,
 )
 from policies.reward_policy import CycleSummary as RewardSummary, compute_reward as compute_reward_policy
-from policies.error_deviation_policy import ( DeviationContext, compute_deviation )
+from policies.error_deviation_policy import ( ErrorContext, compute_error )
 
 # ----------------------------
 # Execution / buffering alignment
@@ -1076,23 +1076,24 @@ def send_learning_for_cycle(cyc: int) -> None:
 
     # ---- FEEDBACK ----
     if feedback_t > 0 and CONTRACT_FEEDBACK_IDS:
-        # Compute per-cycle start/end per-joint error (no per-timestep reads required).
+        # Build per-cycle init/end/target snapshots for the ERROR policy.
+        # (This does NOT affect reward; reward still uses q0/q1 below.)
         q0 = cycle_start_q_raw.get(int(cyc)) or (last_q_raw[:] if last_q_raw else target_q_raw[:])
         q1 = cycle_end_q_raw.get(int(cyc))   or (last_q_raw[:] if last_q_raw else target_q_raw[:])
-        err0_by_joint = _per_joint_errors_from_q(q0)
-        err1_by_joint = _per_joint_errors_from_q(q1)
 
-        # Policy will turn this into a constant dev[t] across T for each channel.
-        ctx = DeviationContext(
-            err_start_by_joint=err0_by_joint,
-            err_end_by_joint=err1_by_joint,
-            dev_scale=float(DEV_SCALE),
-            dev_deadzone=float(DEV_DEADZONE),
+        q_init_by_joint   = {motor_names[i]: float(q0[i]) for i in range(len(motor_names))}
+        q_end_by_joint    = {motor_names[i]: float(q1[i]) for i in range(len(motor_names))}
+        q_target_by_joint = {motor_names[i]: float(target_q_raw[i]) for i in range(len(motor_names))}
+
+        ctx = ErrorContext(
+            q_init_by_joint=q_init_by_joint,
+            q_end_by_joint=q_end_by_joint,
+            q_target_by_joint=q_target_by_joint,
         )
 
         for fb_id in CONTRACT_FEEDBACK_IDS:
             fbN = _feedback_n_for_id(str(fb_id))
-            dev = compute_deviation(str(fb_id), T=feedback_t, ctx=ctx)
+            dev = compute_error(str(fb_id), T=feedback_t, ctx=ctx)
 
             # DEBUG per channel
             try:
@@ -1100,7 +1101,7 @@ def send_learning_for_cycle(cyc: int) -> None:
                 dv_max = max(dev) if dev else 0.0
                 dv_mean = (sum(abs(x) for x in dev) / len(dev)) if dev else 0.0
                 log.info(
-                    f"[learn] dev[{fb_id}] stats: min={dv_min:.6f} max={dv_max:.6f} mean|.|={dv_mean:.6f} T={len(dev)}"
+                    f"[learn] err[{fb_id}] stats: min={dv_min:.6f} max={dv_max:.6f} mean|.|={dv_mean:.6f} T={len(dev)}"
                 )
             except Exception:
                 pass
