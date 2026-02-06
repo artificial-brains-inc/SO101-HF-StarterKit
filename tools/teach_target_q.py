@@ -31,6 +31,7 @@ from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple
 
 
+
 # ----------------------------
 # Config
 # ----------------------------
@@ -40,6 +41,7 @@ OUT = os.environ.get("TARGET_OUT", "targets/target_touch_mat.json")
 
 # DataName for Feetech present position in LeRobot.
 DATA_NAME_PRESENT = "Present_Position"
+DATA_NAME_TORQUE = "Torque_Enable"
 
 # If scan_port fails, fallback baud candidates:
 BAUD_CANDIDATES = [1_000_000, 500_000, 250_000, 115_200]
@@ -52,6 +54,22 @@ class RobotCtx:
     best_baud: int
     motor_names: List[str]
 
+def _set_torque(bus: object, motor_names: List[str], enabled: bool) -> None:
+    """Enable/disable torque for all motors (teach mode needs torque OFF to backdrive)."""
+    if not hasattr(bus, "sync_write"):
+        print("[warn] Bus has no sync_write; cannot toggle torque.")
+        return
+    val = 1 if enabled else 0
+    try:
+        # Many LeRobot buses accept normalize kwarg
+        bus.sync_write(DATA_NAME_TORQUE, motor_names, [val] * len(motor_names), normalize=False)
+        print(f"[torque] set -> {val}")
+    except TypeError:
+        # Some versions don't have normalize kwarg
+        bus.sync_write(DATA_NAME_TORQUE, motor_names, [val] * len(motor_names))
+        print(f"[torque] set -> {val}")
+    except Exception as e:
+        print("[warn] Failed to set torque:", repr(e))
 
 def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)

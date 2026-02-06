@@ -58,8 +58,31 @@ def _sync_write_any(bus: Any, data_name: str, names: List[str], values: List[int
 
 
 def read_vec(bus: Any, data_name: str, motor_names: List[str]) -> List[int]:
-    m = bus.sync_read(data_name, motor_names, normalize=False)
-    return [int(m[n]) for n in motor_names]
+    """
+    Robust read:
+      1) Try sync_read a few times
+      2) If it keeps failing, fall back to per-motor reads
+    """
+    last_err = None
+
+    # 1) sync_read retries
+    for attempt in range(5):
+        try:
+            m = bus.sync_read(data_name, motor_names, normalize=False)
+            return [int(m[n]) for n in motor_names]
+        except Exception as e:
+            last_err = e
+            time.sleep(0.05)  # small backoff
+
+    # 2) Fallback: per-motor reads (much more reliable)
+    out: List[int] = []
+    for n in motor_names:
+        try:
+            out.append(int(bus.read(data_name, n, normalize=False)))
+        except Exception:
+            out.append(-1)  # mark missing instead of crashing
+    print(f"[WARN] sync_read failed ({data_name}); fell back to per-motor reads. Last err: {last_err}")
+    return out
 
 
 def set_torque(bus: Any, motor_names: List[str], enabled: bool) -> None:

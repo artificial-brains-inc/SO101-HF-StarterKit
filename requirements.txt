@@ -1,5 +1,5 @@
 # --- ArtificialBrains SDK (you said you're bumping to 0.1.5) ---
-artificialbrains-sdk==0.1.5
+artificialbrains-sdk==0.1.6
 
 # --- Hugging Face / LeRobot (SO-101 follower + Feetech bus support) ---
 lerobot[feetech]
