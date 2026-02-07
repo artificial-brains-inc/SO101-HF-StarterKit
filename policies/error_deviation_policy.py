@@ -103,19 +103,26 @@ def compute_error(
     q1 = float(ctx.q_end_by_joint.get(joint, 0.0))
     qt = float(ctx.q_target_by_joint.get(joint, 0.0))
 
-    e0 = (q0 - qt)   # signed error at init
-    e1 = (q1 - qt)   # signed error at end
-    d0 = abs(e0)
-    d1 = abs(e1)
+    # Signed errors relative to target
+    e0 = (q0 - qt)   # init signed error
+    e1 = (q1 - qt)   # end signed error
 
+    # Per-joint normalization range is the init-to-target distance
+    rng = abs(e0)
     eps = 1e-9
-    if d0 <= eps:
-        # started essentially at target: no side to define overshoot
-        mag = 0.0 if d1 <= eps else 1.0
-        err_signed = 0.0 if d1 <= eps else 1.0
+
+    if rng <= eps:
+        # Started essentially at target => no "side" to define overshoot.
+        # Treat: perfect if still at target, otherwise max positive error.
+        err_signed = 0.0 if abs(e1) <= eps else 1.0
     else:
-        mag = _clamp01(d1 / d0)
-        crossed = (e0 * e1) < 0.0
-        err_signed = (-mag) if crossed else (+mag)
+        # Magnitude: where end error lands within the init->target range (clipped to 1)
+        mag = abs(e1) / rng
+        if mag > 1.0:
+            mag = 1.0
+
+        # Overshoot: crossed to the other side of the target relative to start
+        overshot = (e0 * e1) < 0.0
+        err_signed = (-mag) if overshot else (+mag)
 
     return _constant_T(_clamp11(err_signed), T)
