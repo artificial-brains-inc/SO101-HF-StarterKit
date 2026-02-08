@@ -248,7 +248,58 @@ def set_mode_position(bus: Any, motor_names: List[str]) -> None:
 # Camera helpers
 # ----------------------------
 
-def get_rgb_jpeg_bytes() -> Tuple[bytes, Dict[str, Any]]:
+def get_rgb_jpeg_bytes_raspberry() -> Tuple[bytes, Dict[str, Any]]:
+    """
+    Capture one frame directly to memory (no temp files).
+    """
+    dev = str(SO101_CAM_DEV)
+    w = int(SO101_CAM_W)
+    h = int(SO101_CAM_H)
+    quality = int(SO101_CAM_JPEG_QUALITY)
+    
+    # Force V4L2 backend and use device index
+    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)  # Use index 0 for /dev/video0
+    if not cap.isOpened():
+        raise RuntimeError(f"Cannot open camera {dev}")
+    
+    try:
+        # Set MJPEG format (camera supports it, more efficient)
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoCapture.fourcc('M','J','P','G'))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+        cap.set(cv2.CAP_PROP_FPS, 30)
+        
+        # Grab a few frames to let camera auto-adjust
+        for _ in range(3):
+            cap.grab()
+        
+        # Capture the actual frame
+        ret, frame = cap.read()
+        if not ret or frame is None:
+            raise RuntimeError("Failed to capture frame")
+        
+        # Encode to JPEG in memory
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+        ret, jpeg_buf = cv2.imencode('.jpg', frame, encode_param)
+        if not ret:
+            raise RuntimeError("Failed to encode JPEG")
+        
+        jpeg_bytes = jpeg_buf.tobytes()
+        meta = {
+            "width": w,
+            "height": h,
+            "quality": quality,
+            "device": dev,
+            "via": "opencv"
+        }
+        
+        return jpeg_bytes, meta
+        
+    finally:
+        cap.release()
+
+
+def get_rgb_jpeg_bytes_default() -> Tuple[bytes, Dict[str, Any]]:
     """
     Capture one frame directly to memory (no temp files).
     """
@@ -296,6 +347,13 @@ def get_rgb_jpeg_bytes() -> Tuple[bytes, Dict[str, Any]]:
     finally:
         cap.release()
 
+
+IS_RASPBERRY = os.getenv("IS_RASPBERRY", "false").lower() in ("true", "1", "yes")
+
+if IS_RASPBERRY:
+    get_rgb_jpeg_bytes = get_rgb_jpeg_bytes_raspberry
+else:
+    get_rgb_jpeg_bytes = get_rgb_jpeg_bytes_default
 
 # ----------------------------
 # Env
