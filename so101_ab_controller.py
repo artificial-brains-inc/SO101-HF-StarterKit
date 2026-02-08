@@ -250,7 +250,7 @@ def set_mode_position(bus: Any, motor_names: List[str]) -> None:
 
 def get_rgb_jpeg_bytes_raspberry() -> Tuple[bytes, Dict[str, Any]]:
     """
-    Capture one frame directly to memory (no temp files).
+    Capture one frame directly to memory (no temp files) - Raspberry Pi version.
     """
     dev = str(SO101_CAM_DEV)
     w = int(SO101_CAM_W)
@@ -264,7 +264,7 @@ def get_rgb_jpeg_bytes_raspberry() -> Tuple[bytes, Dict[str, Any]]:
     
     try:
         # Set MJPEG format (camera supports it, more efficient)
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoCapture.fourcc('M','J','P','G'))
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M','J','P','G'))  # Fixed this line
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
         cap.set(cv2.CAP_PROP_FPS, 30)
@@ -290,7 +290,7 @@ def get_rgb_jpeg_bytes_raspberry() -> Tuple[bytes, Dict[str, Any]]:
             "height": h,
             "quality": quality,
             "device": dev,
-            "via": "opencv"
+            "via": "opencv-v4l2"
         }
         
         return jpeg_bytes, meta
