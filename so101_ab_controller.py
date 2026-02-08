@@ -258,7 +258,7 @@ def get_rgb_jpeg_bytes_raspberry() -> Tuple[bytes, Dict[str, Any]]:
     quality = int(SO101_CAM_JPEG_QUALITY)
     
     # Force V4L2 backend and use device index
-    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)  # Use index 0 for /dev/video0
+    cap = cv2.VideoCapture(dev, cv2.CAP_V4L2)  # Use index 0 for /dev/video0
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open camera {dev}")
     
@@ -267,7 +267,6 @@ def get_rgb_jpeg_bytes_raspberry() -> Tuple[bytes, Dict[str, Any]]:
         cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M','J','P','G'))  # Fixed this line
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
-        cap.set(cv2.CAP_PROP_FPS, 30)
         
         # Grab a few frames to let camera auto-adjust
         for _ in range(3):
