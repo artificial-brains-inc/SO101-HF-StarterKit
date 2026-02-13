@@ -13,31 +13,31 @@
       "gripper"
     ]
   },
-  "created_at_unix": 1769741955.0234413,
+  "created_at_unix": 1770924317.3702822,
   "limits_raw": {
     "shoulder_pan": {
-      "min": 1375.0,
-      "max": 2442.0
+      "min": 1185.0,
+      "max": 3892.0
     },
     "shoulder_lift": {
-      "min": 872.0,
-      "max": 2931.0
+      "min": 1585.0,
+      "max": 3620.0
     },
     "elbow_flex": {
-      "min": 1116.0,
-      "max": 3025.0
+      "min": 1543.0,
+      "max": 3638.0
     },
     "wrist_flex": {
-      "min": 1232.0,
-      "max": 3060.0
+      "min": 2253.0,
+      "max": 4021.0
     },
     "wrist_roll": {
-      "min": 12.0,
-      "max": 1169.0
+      "min": 591.0,
+      "max": 3017.0
     },
     "gripper": {
-      "min": 2044.0,
-      "max": 2890.0
+      "min": 515.0,
+      "max": 3417.0
     }
   },
   "buffer_ticks": 25.0

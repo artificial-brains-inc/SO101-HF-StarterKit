@@ -8,11 +8,6 @@
   "io": {
     "inputs": [
       {
-        "id": "Cam",
-        "kind": "Image",
-        "fromOutput": null
-      },
-      {
         "id": "fbGripper",
         "kind": "Feedback",
         "fromOutput": "gripper"

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, TypedDict
 
 
-CONTRACT_SHA256 = "45e355cf37efc3764b251fcf93a0d4cb3fa4994f21f88590f1d231f1d19a3e86"
+CONTRACT_SHA256 = "24fdbbbbaae4e7d0e70bdc8648cf2508f8c547b120dfdacc7c81ed78d5ca5685"
 
 # Constants (as reported by server)
 GAMMA: int = 64
@@ -23,7 +23,7 @@ FEEDBACK_N: int = 32
 FEEDBACK_T: int = 128
 
 # IDs you typically need in policies
-INPUT_IDS: List[str] = ['Cam', 'fbGripper', 'FB_shoulder_pan', 'FB_shoulder_lift', 'FB_elbow_flex', 'FB_wrist_flex', 'FB_wrist_roll', 'shoulder_pan_input', 'shoulder_lift_input', 'elbow_felx_input', 'wrist_roll_input', 'wrist_flex_input', 'gripper_input']
+INPUT_IDS: List[str] = ['fbGripper', 'FB_shoulder_pan', 'FB_shoulder_lift', 'FB_elbow_flex', 'FB_wrist_flex', 'FB_wrist_roll', 'shoulder_pan_input', 'shoulder_lift_input', 'elbow_felx_input', 'wrist_roll_input', 'wrist_flex_input', 'gripper_input']
 OUTPUT_IDS: List[str] = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper']
 FEEDBACK_IDS: List[str] = ['fbGripper', 'FB_shoulder_pan', 'FB_shoulder_lift', 'FB_elbow_flex', 'FB_wrist_flex', 'FB_wrist_roll']
 
